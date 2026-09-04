@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>NTRO // Threat Defense Console [PS-26145]</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 font-mono min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="h-3 w-3 rounded-full bg-emerald-500 animate-ping"></div>
+      <h1 class="text-base font-black tracking-widest uppercase bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-400 bg-clip-text text-transparent">
+        NTRO // ACTIVE THREAT PIPELINE
+      </h1>
+      <span class="text-[10px] bg-slate-800 text-cyan-400 font-semibold px-2 py-0.5 rounded border border-slate-700">CONSTRAINT-D COMPLIANT</span>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex items-center gap-4 text-xs">
+      <div class="flex items-center gap-2">
+        <label class="text-slate-400 uppercase text-[11px]">Ingest Wire:</label>
+        <select id="source-select" class="bg-slate-900 border border-slate-700 text-cyan-300 px-3 py-1.5 rounded focus:outline-none focus:border-cyan-500">
+          <option value="eth0">eth0 (Live Interface)</option>
+        </select>
+        <button id="connect-btn" onclick="reconnect()" class="bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-3 py-1.5 rounded transition shadow-lg shadow-cyan-900/50">
+          START STREAM
+        </button>
+      </div>
+      <div id="status-pill" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">
+        <span class="h-2 w-2 rounded-full bg-slate-500" id="status-dot"></span>
+        <span id="status-text">OFFLINE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Metric Gauges Bar -->
+  <main class="flex-1 p-6 space-y-6 max-w-[1600px] w-full mx-auto">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-lg relative overflow-hidden backdrop-blur-sm">
+        <div class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Total Ingested Flows</div>
+        <div id="metric-flows" class="text-3xl font-extrabold text-cyan-400 mt-1">0</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">Bidirectional micro-flows</div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-lg relative overflow-hidden backdrop-blur-sm">
+        <div class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Flow Processing Rate</div>
+        <div id="metric-fps" class="text-3xl font-extrabold text-sky-300 mt-1">0 <span class="text-sm font-normal text-slate-400">flows/s</span></div>
+        <div class="text-[10px] text-slate-500 mt-0.5">Sub-second ingestion rate</div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 p-4 rounded-lg relative overflow-hidden backdrop-blur-sm">
+        <div class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Sustained Wire Throughput</div>
+        <div id="metric-mbps" class="text-3xl font-extrabold text-indigo-400 mt-1">0.00 <span class="text-sm font-normal text-slate-400">Mbps</span></div>
+        <div class="text-[10px] text-slate-500 mt-0.5">Zero-decryption inspection</div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-rose-950/60 p-4 rounded-lg relative overflow-hidden backdrop-blur-sm">
+        <div class="text-[11px] text-rose-400 font-bold uppercase tracking-wider">Threat Interceptions</div>
+        <div id="metric-alerts" class="text-3xl font-extrabold text-rose-500 mt-1">0</div>
+        <div class="text-[10px] text-slate-500 mt-0.5">Across Engines A, B, C & D</div>
+      </div>
+    </div>
+
+    <!-- Telemetry Chart & Engines Status -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 bg-slate-900/60 border border-slate-800 p-5 rounded-lg">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs uppercase tracking-wider font-bold text-slate-400">Real-Time Ingestion Velocity (FPS)</span>
+          <span class="text-[11px] text-emerald-400 flex items-center gap-1">
+            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Live Buffer
+          </span>
+        </div>
+        <div class="h-56">
+          <canvas id="fpsChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Engine Matrix Info Panel -->
+      <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-lg flex flex-col justify-between">
+        <div class="text-xs uppercase tracking-wider font-bold text-slate-400 mb-3">Multi-Engine Verification Matrix</div>
+        <div class="space-y-3 text-xs">
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-slate-200">Engine A: L4 Random Forest</div>
+              <div class="text-[10px] text-slate-500">15 statistical flow dynamics</div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">ARMED</span>
+          </div>
+
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-slate-200">Engine B: Shannon Entropy</div>
+              <div class="text-[10px] text-slate-500">DNS Tunneling & DGA heuristic</div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">ARMED</span>
+          </div>
+
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-slate-200">Engine C: Beacon Periodicity</div>
+              <div class="text-[10px] text-slate-500">Interval variance (CV &le; 0.20)</div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">ARMED</span>
+          </div>
+
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-slate-200">Engine D: Encrypted Profiler</div>
+              <div class="text-[10px] text-slate-500">Direct-to-IP / SNI-less TLS C2</div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">ARMED</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Threat & Forensic Interception Feed -->
+    <div class="bg-slate-900/60 border border-slate-800 rounded-lg overflow-hidden flex flex-col">
+      <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shield-alert" class="w-4 h-4 text-rose-500"></i>
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Live Wire & Forensic Interceptions</span>
+        </div>
+        <span id="alert-counter-badge" class="text-[10px] bg-rose-950 text-rose-400 px-2 py-0.5 rounded border border-rose-800">0 EVENTS</span>
+      </div>
+
+      <div class="overflow-x-auto max-h-80 overflow-y-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-950/80 sticky top-0 text-[11px] uppercase text-slate-400 border-b border-slate-800">
+            <tr>
+              <th class="p-3">Timestamp (UTC)</th>
+              <th class="p-3">Detector</th>
+              <th class="p-3">Classification</th>
+              <th class="p-3">Channel / 5-Tuple</th>
+              <th class="p-3">Confidence</th>
+              <th class="p-3">Forensic Evidence</th>
+            </tr>
+          </thead>
+          <tbody id="alerts-table" class="divide-y divide-slate-800/60 font-mono">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let socket = null;
+    const maxDataPoints = 30;
+    const ctx = document.getElementById('fpsChart').getContext('2d');
+
+    const fpsChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: Array(maxDataPoints).fill(''),
+        datasets: [{
+          label: 'Flows Per Second',
+          data: Array(maxDataPoints).fill(0),
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56, 189, 248, 0.08)',
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2,
+          pointRadius: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: {
+          x: { display: false },
+          y: {
+            grid: { color: '#1e293b' },
+            ticks: { color: '#64748b', font: { family: 'monospace', size: 10 } }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    async function refreshPcapList() {
+      try {
+        const res = await fetch('/api/pcaps');
+        if (!res.ok) return;
+        const pcaps = await res.json();
+        const select = document.getElementById('source-select');
+        if (!select) return;
+
+        const currentVal = select.value;
+        select.innerHTML = '<option value="eth0">eth0 (Live Interface)</option>';
+
+        pcaps.forEach(pcap => {
+          const opt = document.createElement('option');
+          opt.value = pcap;
+          opt.textContent = pcap + ' (PCAP Replay)';
+          select.appendChild(opt);
+        });
+
+        if (currentVal) select.value = currentVal;
+      } catch (e) {
+        console.error('Error fetching PCAP files:', e);
+      }
+    }
+
+    function reconnect() {
+      if (socket) {
+        socket.close();
+      }
+      const source = document.getElementById('source-select').value;
+      const statusText = document.getElementById('status-text');
+      const statusDot = document.getElementById('status-dot');
+
+      statusText.innerText = "CONNECTING...";
+      statusDot.className = "h-2 w-2 rounded-full bg-amber-500 animate-pulse";
+
+      socket = new WebSocket(`ws://localhost:8000/ws/live?source=${source}`);
+
+      socket.onopen = () => {
+        statusText.innerText = `STREAMING (${source})`;
+        statusDot.className = "h-2 w-2 rounded-full bg-emerald-500";
+      };
+
+      socket.onmessage = (event) => {
+        const payload = JSON.parse(event.data);
+
+        if (payload.event_type === "TELEMETRY") {
+          const d = payload.data;
+          document.getElementById('metric-flows').innerText = d.flows_processed.toLocaleString();
+          document.getElementById('metric-fps').innerHTML = `${d.sustained_fps} <span class="text-sm font-normal text-slate-400">flows/s</span>`;
+          document.getElementById('metric-mbps').innerHTML = `${d.sustained_mbps} <span class="text-sm font-normal text-slate-400">Mbps</span>`;
+          document.getElementById('metric-alerts').innerText = d.alerts_count;
+
+          fpsChart.data.datasets[0].data.push(d.sustained_fps);
+          fpsChart.data.datasets[0].data.shift();
+          fpsChart.update();
+        }
+
+        if (payload.event_type === "ALERT") {
+          const a = payload.data;
+          const table = document.getElementById('alerts-table');
+          const row = document.createElement('tr');
+
+          const isBenign = a.threat_class === "BENIGN_TRAFFIC";
+          row.className = isBenign
+            ? "hover:bg-emerald-950/20 bg-emerald-950/10 transition border-l-2 border-emerald-500 font-mono"
+            : "hover:bg-rose-950/20 bg-rose-950/10 transition border-l-2 border-rose-500 font-mono";
+
+          const evidenceStr = JSON.stringify(a.evidence || a.metrics || {}).replace(/"/g, '').replace(/[{}]/g, ' ');
+          const engineColor = isBenign ? "text-emerald-400" : "text-cyan-400";
+          const classColor = isBenign ? "text-emerald-400 font-semibold" : "text-rose-400 font-bold";
+          const confColor = isBenign ? "text-emerald-400" : "text-amber-400 font-bold";
+
+          row.innerHTML = `
+            <td class="p-3 text-slate-400 whitespace-nowrap">${a.timestamp_iso || ''}</td>
+            <td class="p-3 font-bold ${engineColor}">${a.engine || 'INSPECTOR'}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded ${isBenign ? 'border border-emerald-800 bg-emerald-950 text-emerald-400' : 'border border-rose-800 bg-rose-950 text-rose-400'}">${a.threat_class || 'UNKNOWN'}</span></td>
+            <td class="p-3 text-slate-300">${a.channel || a.flow_id || 'N/A'}</td>
+            <td class="p-3 ${confColor}">${Math.round((a.confidence_score || 0) * 100)}%</td>
+            <td class="p-3 text-[11px] text-slate-400 truncate max-w-xs" title="${evidenceStr}">${evidenceStr}</td>
+          `;
+          table.prepend(row);
+
+          if (table.children.length > 150) {
+            table.removeChild(table.lastChild);
+          }
+
+          if (!isBenign) {
+            const countElem = document.getElementById('alert-counter-badge');
+            let currentCount = parseInt(countElem.innerText.split(' ')[0]) || 0;
+            countElem.innerText = `${currentCount + 1} EVENTS`;
+          }
+        }
+
+        if (payload.event_type === "STATUS") {
+          statusText.innerText = "STREAM COMPLETE";
+          statusDot.className = "h-2 w-2 rounded-full bg-slate-500";
+        }
+      };
+
+      socket.onerror = () => {
+        statusText.innerText = "DISCONNECTED";
+        statusDot.className = "h-2 w-2 rounded-full bg-rose-500";
+      };
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      await refreshPcapList();
+      reconnect();
+    });
+
+    const sel = document.getElementById('source-select');
+    if (sel) sel.addEventListener('focus', refreshPcapList);
+  </script>
+</body>
+</html>
